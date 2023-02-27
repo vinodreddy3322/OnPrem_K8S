@@ -1,0 +1,25 @@
+pipeline {
+  agent any
+
+  stages {
+    stage('Print Pod Status') {
+      steps {
+        script {
+          def kubeconfig = credentials('aws-eks-kubeconfig')
+          def namespace = 'default'
+          def podStatus = sh(
+            script: "kubectl get pods --namespace ${namespace} --kubeconfig ${kubeconfig} -o jsonpath='{range .items[*]}{.metadata.name}{"\\t"}{.status.phase}{"\\n"}{end}'",
+            returnStdout: true
+          )
+          println(podStatus)
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      cleanWs()
+    }
+  }
+}
