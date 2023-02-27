@@ -1,0 +1,36 @@
+pipeline {
+  agent any
+  
+  environment {
+    AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
+    AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
+    AWS_REGION = 'us-west-2' // Replace with your EKS cluster's region
+    EKS_CLUSTER_NAME = 'my-eks-cluster' // Replace with your EKS cluster's name
+  }
+  
+  stages {
+    stage('List Error Status Pods') {
+      steps {
+        script {
+          def eks = [:]
+          eks.withAWS(region: AWS_REGION, credentials: 'aws') {
+            def kubeconfig = sh(script: "aws eks update-kubeconfig --name ${EKS_CLUSTER_NAME} --query 'kubeconfig'", returnStdout: true).trim()
+            def pods = sh(script: "kubectl get pods --kubeconfig <(echo ${kubeconfig}) --all-namespaces --field-selector status.phase!=Running,status.phase!=Succeeded -o jsonpath='{range .items[*]}{.metadata.namespace}{\"/\"}{.metadata.name}{\" \"}{.status.phase}{\"\\n\"}{end}'", returnStdout: true).trim()
+            if (pods) {
+              echo "The following pods are in an error status:"
+              echo pods
+            } else {
+              echo "No pods are in an error status."
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  post {
+    always {
+      cleanWs()
+    }
+  }
+}
