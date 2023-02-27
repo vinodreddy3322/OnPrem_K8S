@@ -1,0 +1,19 @@
+pipeline {
+    agent any
+    
+    stages {
+        stage('Get EKS credentials') {
+            steps {
+                withAWS(region: 'us-west-2', credentials: 'aws-creds') {
+                    sh 'aws eks update-kubeconfig --name my-cluster'
+                }
+            }
+        }
+        
+        stage('Check pod status') {
+            steps {
+                sh 'kubectl get pods'
+            }
+        }
+    }
+}
