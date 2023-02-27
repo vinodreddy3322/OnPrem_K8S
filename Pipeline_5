@@ -1,0 +1,32 @@
+pipeline {
+  agent any
+  
+  environment {
+    AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
+    AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
+    AWS_REGION = 'us-west-2' // Replace with your AWS region
+  }
+  
+  stages {
+    stage('Print Error Pods in All Clusters') {
+      steps {
+        script {
+          def eks = [:]
+          eks.withAWS(region: AWS_REGION, credentials: 'aws') {
+            def clusters = sh(script: "aws eks list-clusters --query 'clusters[]'", returnStdout: true).trim().readLines()
+            clusters.each { cluster ->
+              def kubeconfig = sh(script: "aws eks update-kubeconfig --name ${cluster} --query 'kubeconfig'", returnStdout: true).trim()
+              sh(script: "kubectl get pods --kubeconfig <(echo ${kubeconfig}) --all-namespaces --field-selector status.phase!=Running,status.phase!=Succeeded --no-headers | awk '{if(\$3 != \"Running\" && \$3 != \"Succeeded\") print}' | sed 's/^/${cluster} /'")
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  post {
+    always {
+      cleanWs()
+    }
+  }
+}
